@@ -33,7 +33,7 @@ options =
             ))
         "The list of to-dos"
  
-    , Option "d" ["done"]
+    , Option "c" ["complete"]
         (ReqArg
             (\arg opt -> do doneToDo arg
                             exitWith ExitSuccess)

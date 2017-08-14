@@ -8,13 +8,14 @@ import Control.DeepSeq (force)
 import System.Directory (getHomeDirectory)
 import Control.Exception.Base (evaluate)
 
+import Data.List (isInfixOf, reverse, (\\))
+
 listToDos :: IO ()
 listToDos = do
-  putStrLn "To-dos"
+  putStrLn "To-dos\n"
   home <- getHomeDirectory
   contents <- readFile (home ++ "/.todo")
   putStrLn contents
-
 
 addToDo :: String -> IO ()
 addToDo todo = do
@@ -25,7 +26,7 @@ addToDo todo = do
   appendFile (home ++ "/.todo") (show (number + 1) ++ ") " ++ todo ++ "\n")
   putStrLn ("To-do added")
   
--- takes a todo or its number
+-- Takes a todo or its number
 doneToDo :: String -> IO ()
 doneToDo input = do
   home <- getHomeDirectory
@@ -34,25 +35,42 @@ doneToDo input = do
                             putStrLn "All to-dos completed"
                 otherwise -> do contents <- readFile (home ++ "/.todo")
                                 evaluate (force contents)
+                                
                                 let todos = lines contents
 
-                                -- bad, but it works
+                                -- Ready for some bad code? I am not
                                 let res = deleteTodoByNumber input todos
-                                if res == todos
-                                  then putStrLn "The to-do doesn't exist"
-                                  else putStrLn "To-do completed"
                                 
-                                writeFile (home ++ "/.todo") ""
-                                rewrite res home 1
-                                
-                                let res = deleteTodoByName input todos
                                 if res == todos
-                                  then putStrLn "The to-do doesn't exist"
-                                  else putStrLn "To-do completed"
-                                  
-                                writeFile (home ++ "/.todo") ""
-                                rewrite res home 1
+                                  then do
+                                  let res = deleteTodoByName input todos
 
+                                  if res == todos
+                                    then do
+
+                                    if check input res > 1
+                                      then do putStrLn "Possible to-dos:\n"
+                                              listToDosWithWord input res
+                                      else do
+                                      let out = deleteTodoByOccurrence input res
+
+                                      if out == res
+                                        then putStrLn "The to-do doesn't exist"
+                                        else do writeFile (home ++ "/.todo") ""
+                                                let reversed = reverse out
+                                                rewrite' reversed home
+                                                putStrLn ("To-do " ++ head(res\\ reversed) ++ " completed")
+                                            
+                                    else do
+                                    let reversed = reverse res
+                                    writeFile (home ++ "/.todo") ""
+                                    rewrite' reversed home
+                                    putStrLn ("To-do " ++ head(todos \\ reversed) ++ " completed")
+                                  
+                                  else do let reversed = reverse res
+                                          writeFile (home ++ "/.todo") ""
+                                          rewrite' reversed home
+                                          putStrLn ("To-do " ++ head(todos\\ res) ++ " completed")
 
 -- Substring until first character occurrence
 substring :: String -> Char -> String
@@ -61,7 +79,6 @@ substring (x:xs) character = if x /= character
                              then [x] ++ substring xs character
                              else []
                                   
--- Is it possible to merge these two functions?
 deleteTodoByNumber :: String -> [String] -> [String]
 deleteTodoByNumber number [] = []
 deleteTodoByNumber number (x:xs) = if number == substring x ')'
@@ -74,7 +91,12 @@ deleteTodoByName name (x:xs) = if name == drop (length (substring x ')') + 2) x
                                then deleteTodoByName name xs
                                else [x] ++ deleteTodoByName name xs
 
--- https://stackoverflow.com/questions/25005778/most-efficient-way-to-get-digit-count-of-arbitrarily-big-number
+deleteTodoByOccurrence :: String -> [String] -> [String]
+deleteTodoByOccurrence word [] = []
+deleteTodoByOccurrence word (x:xs) = if isInfixOf word x
+                                     then deleteTodoByOccurrence word xs
+                                     else [x] ++ deleteTodoByOccurrence word xs
+
 digitCount :: Integer -> Int
 digitCount = go 1 . abs
     where
@@ -83,5 +105,28 @@ digitCount = go 1 . abs
 -- it works, but it's ugly
 rewrite :: [String] -> String -> Integer -> IO ()
 rewrite [] home n = appendFile (home ++ "/.todo") ""
-rewrite (x:xs) home n = do appendFile (home ++ "/.todo") (show n ++ ") " ++ drop (2 + digitCount n) x ++"\n")
+rewrite (x:xs) home n = do appendFile (home ++ "/.todo")
+                             (show n ++ ") " ++
+                              drop (2 + digitCount n) x ++"\n")
                            rewrite xs home (n + 1)
+
+-- it works, but i must reverse the list before calling it
+rewrite' :: [String] -> String -> IO ()
+rewrite' [] home = appendFile (home ++ "/.todo") ""
+rewrite' (x:xs) home = do rewrite' xs home
+                          appendFile (home ++ "/.todo")
+                            (show (length xs + 1) ++
+                             (drop (length (substring x ')')) x) ++ "\n")
+
+check :: String -> [String] -> Int
+check word [] = 0
+check word (x:xs) = if isInfixOf word x
+                    then 1 + check word xs
+                    else 0 + check word xs
+
+listToDosWithWord :: String -> [String] -> IO ()
+listToDosWithWord word [] = return ()
+listToDosWithWord word (x:xs) = if isInfixOf word x
+                                then do putStrLn x
+                                        listToDosWithWord word xs
+                                else listToDosWithWord word xs
