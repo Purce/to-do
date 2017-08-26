@@ -1,30 +1,89 @@
 module ToDo.Actions( addToDo
                    , listToDos
                    , doneToDo
+                   , help
+                   , wrong
                    ) where
 
-import Data.Char (isNumber)
+import Data.Char (isNumber, digitToInt)
 import Control.DeepSeq (force)
 import System.Directory (getHomeDirectory)
 import Control.Exception.Base (evaluate)
 
 import Data.List (isInfixOf, reverse, (\\))
 
+import ToDo.ToDo
+
+addToDo :: String -> IO ()
+addToDo name = do
+  home <- getHomeDirectory
+  contents <- readFile (home ++ "/.todo")
+  evaluate (force contents)
+  let number = length (lines contents) + 1
+  appendFile (home ++ "/.todo") (show (ToDo number name) ++ "\n")
+  putStrLn "To-do added"
+
 listToDos :: IO ()
 listToDos = do
   putStrLn "To-dos\n"
   home <- getHomeDirectory
   contents <- readFile (home ++ "/.todo")
-  putStrLn contents
+  let todos = readAllToDos (lines contents)
+  printToDos todos
 
-addToDo :: String -> IO ()
-addToDo todo = do
-  home <- getHomeDirectory
-  contents <- readFile (home ++ "/.todo")
-  evaluate (force contents)
-  let number = length (lines contents)
-  appendFile (home ++ "/.todo") (show (number + 1) ++ ") " ++ todo ++ "\n")
-  putStrLn ("To-do added")
+wrong :: IO ()
+wrong = putStrLn "Not a valid command. Check \"todo help\""
+
+-- I know, this is bad
+help :: IO ()
+help = do
+  putStrLn "ToDo"
+  putStrLn "Possible commands: add, list, remove, help"
+  putStrLn "Usage: todo <command> [<argument> [<argument> ...]]"
+  putStrLn "add <todo>: insert a to-do in the list"
+  putStrLn "list: show the list"
+  putStrLn "help: show this message"
+---------------------------------------
+
+stringToInt :: String -> Int
+stringToInt string = stringToInt' (reverse string) 10 0
+
+stringToInt' :: String -> Int -> Int -> Int
+stringToInt' [] _ _ = 0
+stringToInt' (x:xs) base n = base ^ n * (digitToInt x) +
+                             (stringToInt' xs base (n + 1))
+
+printToDos :: [ToDo] -> IO ()
+printToDos [] = return ()
+printToDos (x:xs) = do
+  putStrLn (show x)
+  printToDos xs
+
+readAllToDos :: [String] -> [ToDo]
+readAllToDos [] = []
+readAllToDos (x:xs) = (readSingleToDo x) : readAllToDos xs
+
+readSingleToDo :: String -> ToDo
+readSingleToDo line = do
+  let number = readNumber line ')'
+  let name = readName line ')'
+  let num = stringToInt number
+  ToDo num name
+
+readNumber :: String -> Char -> String
+readNumber [] _ = []
+readNumber (x:xs) character = if x /= character 
+                               then x : readNumber xs character
+                               else []
+                                  
+readName :: String -> Char -> String
+readName [] _ = []
+readName (x:xs) character = if x == character
+                             then tail xs
+                             else readName xs character
+
+
+
   
 -- Takes a todo or its number
 doneToDo :: String -> IO ()
@@ -130,3 +189,5 @@ listToDosWithWord word (x:xs) = if isInfixOf word x
                                 then do putStrLn x
                                         listToDosWithWord word xs
                                 else listToDosWithWord word xs
+
+
