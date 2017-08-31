@@ -1,12 +1,13 @@
-# to-do
-Small program that keeps track of your to-dos.
+# todo
+Small program that keeps track of your todos.
 
 ## Usage
-### Add to-do
-`to-do [-a | --add <task>]`
+`todo [add <name> [<date>]] [kill <number> [name <word>]] [list]`
 
-### Complete to-do
-`to-do [-c | --complete <number> | <name> | <word> | all]`
-
-### List to-dos
-`to-do [-l | --list]`
+## Examples
+```
+todo add bread
+todo add "clean room"
+todo kill 1
+todo kill name bread
+```
